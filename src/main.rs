@@ -31,9 +31,8 @@ fn main() -> ! {
     let sio = Sio::new(pac.SIO);
 
     // External high-speed crystal on the pico board is 12Mhz
-    let external_xtal_freq_hz = 12_000_000u32;
     let clocks = init_clocks_and_plls(
-        external_xtal_freq_hz,
+        bsp::XOSC_CRYSTAL_FREQ,
         pac.XOSC,
         pac.CLOCKS,
         pac.PLL_SYS,
@@ -56,21 +55,33 @@ fn main() -> ! {
     let mut stepper_dir = pins.gpio15.into_push_pull_output();
     stepper_dir.set_high().unwrap();
 
-    // let pwm_slices = pwm::Slices::new(pac.PWM, &mut pac.RESETS);
-    // let mut pwm7 = pwm_slices.pwm7;
-    // pwm7.set_ph_correct();
-    // pwm7.enable();
+    let pwm_slices = pwm::Slices::new(pac.PWM, &mut pac.RESETS);
+    let mut pwm7 = pwm_slices.pwm7;
+    pwm7.set_ph_correct();
+    pwm7.enable();
 
-    // let mut stepper_pwm = pwm7.channel_a;
-    // stepper_pwm.output_to(pins.gpio14);
+    // Set Pwm frequency to 1MHz
+    // 125MHz / 125 = 1000
+    pwm7.set_div_int(125);
+    pwm7.set_div_frac(0);
 
-    let mut stepper_pin = pins.gpio14.into_push_pull_output();
+    // set pwm top for 1kHz
+    pwm7.set_top(999);
+
+    let mut stepper_pwm = pwm7.channel_a;
+    stepper_pwm.output_to(pins.gpio14);
+
+    stepper_pwm
+        .set_duty_cycle(stepper_pwm.max_duty_cycle() / 2)
+        .unwrap();
 
     loop {
-        stepper_pin.set_high().unwrap();
-        delay.delay_ms(100);
-        stepper_pin.set_low().unwrap();
-        delay.delay_ms(100);
+        info!("Stepper turn clockwise");
+        stepper_dir.set_low().unwrap();
+        delay.delay_ms(1000);
+        info!("Stepper turn counter-clockwise");
+        stepper_dir.set_high().unwrap();
+        delay.delay_ms(1000);
     }
 }
 
